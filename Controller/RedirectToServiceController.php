@@ -76,7 +76,7 @@ final class RedirectToServiceController
     public function redirectToServiceAction(Request $request, string $service): RedirectResponse
     {
         try {
-            $authorizationUrl = $this->oauthUtils->getAuthorizationUrl($request, $service);
+            $authorizationUrl = $this->oauthUtils->getAuthorizationUrl($request, $service, $request->query->get('audience', null));
         } catch (RuntimeException $e) {
             throw new NotFoundHttpException($e->getMessage(), $e);
         }
