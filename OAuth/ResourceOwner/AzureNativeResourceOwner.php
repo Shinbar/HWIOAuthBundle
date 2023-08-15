@@ -12,6 +12,7 @@
 namespace HWI\Bundle\OAuthBundle\OAuth\ResourceOwner;
 
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use Symfony\Component\HttpFoundation\Request as HttpRequest;
 
 /**
  * AzureResourceOwner.
