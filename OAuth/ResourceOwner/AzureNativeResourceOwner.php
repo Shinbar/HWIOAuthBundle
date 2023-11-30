@@ -13,12 +13,15 @@ namespace HWI\Bundle\OAuthBundle\OAuth\ResourceOwner;
 
 use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\HttpFoundation\Request as HttpRequest;
+use HWI\Bundle\OAuthBundle\Security\OAuthErrorHandler;
+
 
 /**
- * AzureResourceOwner.
+ * AzureNativeResourceOwner.
  *
  * @author Baptiste Clavié <clavie.b@gmail.com>
- * 
+ * @author Richard Shine <richard.shine@gmail.com>
+ *
  * @final since 1.4
  */
 class AzureNativeResourceOwner extends GenericOAuth2ResourceOwner
@@ -80,6 +83,62 @@ class AzureNativeResourceOwner extends GenericOAuth2ResourceOwner
 
     /**
      * {@inheritdoc}
+     * @author RES
+     */
+    public function getAccessToken(HttpRequest $request, $redirectUri, array $extraParameters = [])
+    {
+        OAuthErrorHandler::handleOAuthError($request);
+        
+        $redirectUri = ($request->query->has('audience'))
+        ? $request->query->get('audience')
+        : $this->httpUtils->createRequest($request, '/')->getUri(); // $this->httpUtils->createRequest($request, $checkPath)->getUri();
+        
+        $parameters = array_merge([
+            'code' => $request->query->get('code'),
+            'grant_type' => 'authorization_code',
+            'redirect_uri' => $redirectUri,
+        ], $extraParameters);
+        
+        $response = $this->doGetTokenRequest($this->options['access_token_url'], $parameters);
+        $response = $this->getResponseContent($response);
+        
+//         throw new \Exception(var_export(array_merge([
+//             'url' => $this->options['access_token_url'],
+//             'response' => $response
+//         ],$parameters), true));
+        
+        $this->validateResponseContent($response);
+        
+        return $response;
+    }
+    
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function isCsrfTokenValid($csrfToken)
+    {
+        // Mark token valid when validation is disabled
+        if (!$this->options['csrf']) {
+            return true;
+        }
+        // return true;  // Naughty naughty very naughty
+        
+        if (null === $csrfToken) {
+            throw new AuthenticationException('Given CSRF token is not valid.');
+        }
+        
+        try {
+            return null !== $this->storage->fetch($this, urldecode($csrfToken), 'csrf_state');
+        } catch (\InvalidArgumentException $e) {
+            
+            throw new AuthenticationException('Given CSRF token is not valid.');
+        }
+    }
+    
+    
+    /**
+     * {@inheritdoc}
      */
     protected function configureOptions(OptionsResolver $resolver)
     {
@@ -93,51 +152,5 @@ class AzureNativeResourceOwner extends GenericOAuth2ResourceOwner
             'api_version' => 'v1.0',
             'csrf' => true,
         ]);
-    }
-
-    /**
-     * {@inherit doc}
-     * @author RES
-     */
-    public function getAccessToken(HttpRequest $request, $redirectUri, array $extraParameters = []) {
-        
-        OAuthErrorHandler::handleOAuthError($request);
-
-        $redirectUri = ($request->query->has('audience'))
-            ? $request->query->get('audience')
-            : $this->httpUtils->createRequest($request, '')->getUri();
-        // $this->httpUtils->createRequest($request, $checkPath)->getUri();
-        
-        $parameters = array_merge([
-            'code'          => $request->query->get('code'),
-            'grant_type'    => 'authorization_code',
-            'redirect_uri'  => $redirectUri,
-        ], $extraParameters);
-
-        $requestTokenResponse = $this->doGetTokenRequest($this->options['access_token_url'], $parameters);
-        $response = $this->getResponse($requestTokenResponse);
-        
-        $this->validateResponseContent($response);
-
-        return $response;
-    }
-
-    public function isCsrfTokenValid($csrfToken) {
-        
-        // Mark token valid when validation is disabled
-        if (!$this->options['csrf']) {
-            return true;
-        }
-
-        if (null === $csrfToken) {
-            throw new AuthenticationException('Given CSRDF token is not valid.');
-        }
-
-        try {
-            return null !== $this->storage->fetch($this, urldecode($csrfToken), 'csrf_state');
-        } catch (\InvalidArgumentException $e) {
-            throw new AuthenticationException('Given CSRF token is not valid.');
-        }
-
     }
 }
